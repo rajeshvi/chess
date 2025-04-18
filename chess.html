@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chess Game</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            border: 2px solid #333;
+        }
+
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .white {
+            background-color: #f0d9b5;
+        }
+
+        .black {
+            background-color: #b58863;
+            color: white; /* For black pieces */
+        }
+
+        .piece {
+            font-size: 40px;
+            user-select: none; /* Prevent text selection on drag */
+        }
+
+        .selected {
+            border: 3px solid blue;
+        }
+
+        .possible-move {
+            background-color: lightgreen;
+        }
+    </style>
+</head>
+<body>
+    <div class="chessboard" id="chessboard">
+        </div>
+
+    <script>
+        const chessboard = document.getElementById('chessboard');
+        const squares = [];
+        let boardState = [
+            ['br', 'bn', 'bb', 'bq', 'bk', 'bb', 'bn', 'br'],
+            ['bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp', 'bp'],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp', 'wp'],
+            ['wr', 'wn', 'wb', 'wq', 'wk', 'wb', 'wn', 'wr']
+        ];
+        let selectedSquare = null;
+        let possibleMoves = [];
+
+        const pieceMap = {
+            'wp': '&#9817;', 'wr': '&#9816;', 'wn': '&#9814;', 'wb': '&#9815;', 'wq': '&#9813;', 'wk': '&#9812;',
+            'bp': '&#9823;', 'br': '&#9822;', 'bn': '&#9820;', 'bb': '&#9821;', 'bq': '&#9819;', 'bk': '&#9818;'
+        };
+
+        function createBoard() {
+            chessboard.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.dataset.row = i;
+                    square.dataset.col = j;
+                    if ((i + j) % 2 === 0) {
+                        square.classList.add('white');
+                    } else {
+                        square.classList.add('black');
+                    }
+
+                    const pieceCode = boardState[i][j];
+                    if (pieceCode) {
+                        const piece = document.createElement('div');
+                        piece.classList.add('piece');
+                        piece.innerHTML = pieceMap[pieceCode];
+                        square.appendChild(piece);
+                    }
+
+                    square.addEventListener('click', handleSquareClick);
+                    chessboard.appendChild(square);
+                    squares.push(square);
+                }
+            }
+        }
+
+        function updateBoard() {
+            squares.forEach(square => {
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                square.innerHTML = '';
+                const pieceCode = boardState[row][col];
+                if (pieceCode) {
+                    const piece = document.createElement('div');
+                    piece.classList.add('piece');
+                    piece.innerHTML = pieceMap[pieceCode];
+                    square.appendChild(piece);
+                }
+                square.classList.remove('selected');
+                square.classList.remove('possible-move');
+            });
+            if (selectedSquare) {
+                const [row, col] = selectedSquare;
+                squares[row * 8 + col].classList.add('selected');
+                possibleMoves.forEach(move => {
+                    squares[move[0] * 8 + move[1]].classList.add('possible-move');
+                });
+            }
+        }
+
+        function handleSquareClick(event) {
+            const clickedSquare = event.target.closest('.square');
+            if (!clickedSquare) return;
+
+            const row = parseInt(clickedSquare.dataset.row);
+            const col = parseInt(clickedSquare.dataset.col);
+
+            if (selectedSquare) {
+                const [selRow, selCol] = selectedSquare;
+                const isPossibleMove = possibleMoves.some(move => move[0] === row && move[1] === col);
+
+                if (isPossibleMove) {
+                    boardState[row][col] = boardState[selRow][selCol];
+                    boardState[selRow][selCol] = '';
+                    selectedSquare = null;
+                    possibleMoves = [];
+                    updateBoard();
+                } else {
+                    // Deselect if clicking on a different square without a valid move
+                    selectedSquare = null;
+                    possibleMoves = [];
+                    updateBoard();
+                    // Select the new square if it has a piece
+                    if (boardState[row][col]) {
+                        selectedSquare = [row, col];
+                        possibleMoves = getPossibleMoves(row, col);
+                        updateBoard();
+                    }
+                }
+            } else {
+                // Select a square if it has a piece
+                if (boardState[row][col]) {
+                    selectedSquare = [row, col];
+                    possibleMoves = getPossibleMoves(row, col);
+                    updateBoard();
+                }
+            }
+        }
+
+        function getPossibleMoves(row, col) {
+            const piece = boardState[row][col];
+            const moves = [];
+
+            if (piece.startsWith('p')) { // Pawn
+                const direction = piece.startsWith('w') ? -1 : 1;
+                const startRow = piece.startsWith('w') ? 6 : 1;
+
+                // Move one step forward
+                let nextRow = row + direction;
+                if (nextRow >= 0 && nextRow < 8 && !boardState[nextRow][col]) {
+                    moves.push([nextRow, col]);
+                    // Move two steps forward from starting position
+                    if (row === startRow && !boardState[row + 2 * direction][col]) {
+                        moves.push([row + 2 * direction, col]);
+                    }
+                }
+
+                // Capture diagonally
+                [col - 1, col + 1].forEach(nextCol => {
+                    if (nextRow >= 0 && nextRow < 8 && nextCol >= 0 && nextCol < 8 && boardState[nextRow][nextCol] && boardState[nextRow][nextCol].startsWith(piece[0] === 'w' ? 'b' : 'w')) {
+                        moves.push([nextRow, nextCol]);
+                    }
+                });
+            } else if (piece.endsWith('r')) { // Rook
+                const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                for (const [dr, dc] of directions) {
+                    let r = row + dr;
+                    let c = col + dc;
+                    while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                        moves.push([r, c]);
+                        if (boardState[r][c]) {
+                            if (!boardState[r][c].startsWith(piece[0])) {
+                                // Can capture
+                            }
+                            break; // Stop in this direction
+                        }
+                        r += dr;
+                        c += dc;
+                    }
+                }
+            } else if (piece.endsWith('n')) { // Knight
+                const knightMoves = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
+                knightMoves.forEach(([dr, dc]) => {
+                    const nr = row + dr;
+                    const nc = col + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && (!boardState[nr][nc] || !boardState[nr][nc].startsWith(piece[0]))) {
+                        moves.push([nr, nc]);
+                    }
+                });
+            } else if (piece.endsWith('b')) { // Bishop
+                const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+                for (const [dr, dc] of directions) {
+                    let r = row + dr;
+                    let c = col + dc;
+                    while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                        moves.push([r, c]);
+                        if (boardState[r][c]) {
+                            if (!boardState[r][c].startsWith(piece[0])) {
+                                // Can capture
+                            }
+                            break; // Stop in this direction
+                        }
+                        r += dr;
+                        c += dc;
+                    }
+                }
+            } else if (piece.endsWith('q')) { // Queen (Rook + Bishop moves)
+                const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+                for (const [dr, dc] of directions) {
+                    let r = row + dr;
+                    let c = col + dc;
+                    while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                        moves.push([r, c]);
+                        if (boardState[r][c]) {
+                            if (!boardState[r][c].startsWith(piece[0])) {
+                                // Can capture
+                            }
+                            break; // Stop in this direction
+                        }
+                        r += dr;
+                        c += dc;
+                    }
+                }
+            } else if (piece.endsWith('k')) { // King
+                const kingMoves = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+                kingMoves.forEach(([dr, dc]) => {
+                    const nr = row + dr;
+                    const nc = col + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && (!boardState[nr][nc] || !boardState[nr][nc].startsWith(piece[0]))) {
+                        moves.push([nr, nc]);
+                    }
+                });
+            }
+
+            // Basic move generation, doesn't include checks, castling, en passant, etc.
+            return moves;
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
